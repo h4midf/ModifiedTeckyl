@@ -1,0 +1,4 @@
+def vv(float32(K) A, float32(K) B) -> (float32 C)
+{
+  C += A(k) * B(k) where k in 0:K
+}

@@ -1,4 +1,4 @@
-def mm(float32(K) A, float32(K) B) -> (float32(1) C)
+def vv(float32(K) A, float32(K) B) -> (float32(1) C)
 {
   C(i) += A(k) * B(k) where k in 0:K, i in 0:1
 }
