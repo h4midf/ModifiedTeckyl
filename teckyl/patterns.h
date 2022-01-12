@@ -20,6 +20,112 @@ static inline bool isConstantInitialization(const lang::Comprehension &c) {
   return (c.assignment()->kind() == '=' && c.rhs()->kind() == lang::TK_CONST);
 }
 
+// h4mid
+// Checks if a comprehension is a vector-vector product, i.e., if it
+// has the pattern
+//
+//   C(0) +=! A(i) * B(i) or
+//   C(0) +=! B(i) * A(i) or
+//   C(0) += A(i) * B(i) or
+//   C(0) += B(i) * A(i)
+//
+// Returns true if the pattern matches, otherwise false. If
+// inverse_operands is non-NULL, its value will be set to false if the
+// first pattern matches or true if the second pattern matches. If no
+// pattern matches, inverse_operands is left untouched.
+//
+// The output parameter definit indicates whether the output matrix is
+// default initialized with zeros
+
+static inline bool
+isVecvecComprehensionEx(const lang::Comprehension &c, bool *definit,
+                        size_t (*canonical_order)[2] = NULL) {
+  lang::ListView<lang::Ident> lhsIdents = c.indices();
+  
+  // Ensure this is a sum of products
+  if ((c.assignment()->kind() != lang::TK_PLUS_EQ_B &&
+       c.assignment()->kind() != lang::TK_PLUS_EQ) ||
+      c.rhs()->kind() != '*')
+    return false;
+  *definit = (c.assignment()->kind() == lang::TK_PLUS_EQ_B);
+
+  // Ensure that the output is 
+  // if (lhsIdents.size() == 1)
+  //   return false;
+
+  // Ensure that there are exactly two operands to the multiplication
+  if (c.rhs()->trees().size() != 2)
+    return false;
+
+  // Ensure that the source operands are indexed tensors
+  if (c.rhs()->tree(0)->kind() != lang::TK_ACCESS ||
+      c.rhs()->tree(1)->kind() != lang::TK_ACCESS) {
+    return false;
+  }
+
+  std::vector<lang::Access> accesses = {lang::Access(c.rhs()->tree(0)),
+                                        lang::Access(c.rhs()->tree(1))};
+
+  bool inv;
+
+  if (accesses[0].arguments().size() == 1 &&
+      accesses[1].arguments().size() == 1) {
+    // two operands are vector
+    inv = false;
+  } else {
+    // Operands are not exactly one vector and one vector
+    return false;
+  }
+
+  // Ensure that the output operand is not used as an input
+  if (accesses[0].name().name() == c.ident().name() ||
+      accesses[1].name().name() == c.ident().name()) {
+    return false;
+  }
+
+  // Check that the vectors are indexed directly by identifiers
+  if (accesses[0].arguments()[0]->kind() != lang::TK_IDENT ||
+      accesses[1].arguments()[0]->kind() != lang::TK_IDENT) {
+    return false;
+  }
+
+  lang::Ident vectorIdent0 = lang::Ident(accesses[0].arguments()[0]);
+  lang::Ident vectorIdent1 = lang::Ident(accesses[1].arguments()[0]);
+
+  // Ensure that the iterator for the inputs is used to index the
+  // first dimension of the first and second vector and that the iterator for the
+  // is used to iterate over 
+  bool ret = vectorIdent1.name() == vectorIdent0.name();
+
+  if (ret && canonical_order) {
+    (*canonical_order)[0] = 0;
+    (*canonical_order)[1] = 1;
+  }
+
+  return ret;
+}
+
+static inline bool isVecvecComprehension(const lang::Comprehension &c,
+                                         size_t (*canonical_order)[2] = NULL) {
+  bool definit;
+  if (!isVecvecComprehensionEx(c, &definit, canonical_order))
+    return false;
+
+  return !definit;
+}
+
+static inline bool
+isDefinitVecvecComprehension(const lang::Comprehension &c,
+                             size_t (*canonical_order)[2] = NULL) {
+  bool definit;
+  if (!isVecvecComprehensionEx(c, &definit, canonical_order))
+    return false;
+
+  return definit;
+}
+
+// end h4mid
+
 // Checks if a comprehension is a matrix-vector product, i.e., if it
 // has the pattern
 //

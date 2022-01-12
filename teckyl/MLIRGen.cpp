@@ -1056,7 +1056,6 @@ private:
           mlir::ArrayRef<mlir::Value>{rearranged.begin(), rearranged.end()});
 
       builder.create<OP_T>(loc(c.range()), mlir::TypeRange{}, operands);
-
       return true;
     }
 
@@ -1101,7 +1100,6 @@ private:
       buildFillOp(lang::Const(c.rhs()), outputs[0]);
       return true;
     }
-
     return tryBuildSpecializedLinalgOp<mlir::linalg::MatmulOp, 2,
                                        pattern::isMatmulComprehension>(
                c, inputs, outputs) ||
@@ -1113,7 +1111,16 @@ private:
                c, inputs, outputs) ||
            tryBuildSpecializedLinalgOp<mlir::linalg::MatvecOp, 2,
                                        pattern::isDefinitMatvecComprehension>(
+               c, inputs, outputs) ||
+
+          // h4mid
+           tryBuildSpecializedLinalgOp<mlir::linalg::VecvecOp, 2,
+                                       pattern::isVecvecComprehension>(
+               c, inputs, outputs) ||
+           tryBuildSpecializedLinalgOp<mlir::linalg::VecvecOp, 2,
+                                       pattern::isDefinitVecvecComprehension>(
                c, inputs, outputs);
+          // h4mid end
   }
 
   // Builds the core of a comprehension (e.g., just the actual
@@ -1255,8 +1262,9 @@ private:
     bool buildGeneric = true;
 
     if (options.specialize_linalg_ops) {
-      if (tryBuildSpecializedLinalgOp(c, inputs, outputs))
+      if (tryBuildSpecializedLinalgOp(c, inputs, outputs)){
         buildGeneric = false;
+      }
     }
 
     if (buildGeneric) {
